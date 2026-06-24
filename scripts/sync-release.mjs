@@ -34,12 +34,17 @@ if (!githubToken) {
 
 const githubApiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
 const npmPackage = await fetchNpmPackage(packageName, packageVersion);
+const githubPackageName =
+  process.env.GITHUB_PACKAGE_NAME ?? createGitHubPackageName(repository, packageName);
+const githubPackageStatus = process.env.GITHUB_PACKAGE_STATUS ?? "unknown";
 const releaseBody = createReleaseSyncBlock({
   packageName,
   packageVersion,
   repository,
   releaseTag,
   npmPackage,
+  githubPackageName,
+  githubPackageStatus,
 });
 
 const existingRelease = await githubRequest(
@@ -110,8 +115,11 @@ function createReleaseSyncBlock({
   repository,
   releaseTag,
   npmPackage,
+  githubPackageName,
+  githubPackageStatus,
 }) {
   const npmUrl = `https://www.npmjs.com/package/${packageName}/v/${packageVersion}`;
+  const githubPackageUrl = `https://github.com/${repository}/pkgs/npm/${packageName}`;
   const demoUrl = `https://${repository.split("/")[0]}.github.io/${
     repository.split("/")[1]
   }/`;
@@ -124,6 +132,10 @@ function createReleaseSyncBlock({
   const integrityLine = npmPackage?.dist?.integrity
     ? `- Integrity: \`${npmPackage.dist.integrity}\``
     : undefined;
+  const githubPackageLine =
+    githubPackageStatus === "published"
+      ? `- GitHub Packages: [${githubPackageName}@${packageVersion}](${githubPackageUrl})`
+      : `- GitHub Packages: not confirmed yet. The Release workflow publishes the mirror package as \`${githubPackageName}@${packageVersion}\`.`;
 
   return [
     startMarker,
@@ -131,7 +143,9 @@ function createReleaseSyncBlock({
     "",
     `- GitHub Release: ${releaseTag}`,
     `- npm: ${npmStatus}`,
+    githubPackageLine,
     `- Install: \`npm i ${packageName}@${packageVersion}\``,
+    `- GitHub Packages install: \`npm i ${githubPackageName}@${packageVersion} --registry=https://npm.pkg.github.com\``,
     `- Demo: ${demoUrl}`,
     tarballLine,
     integrityLine,
@@ -142,6 +156,11 @@ function createReleaseSyncBlock({
   ]
     .filter((line) => line !== undefined)
     .join("\n");
+}
+
+function createGitHubPackageName(repository, packageName) {
+  const owner = repository.split("/")[0].toLowerCase();
+  return `@${owner}/${packageName}`;
 }
 
 function replaceManagedBlock(existingBody, managedBlock) {

@@ -17,6 +17,7 @@ on:
 permissions:
   contents: write
   id-token: write
+  packages: write
 
 concurrency:
   group: release-${{ github.workflow }}-${{ github.ref }}
@@ -74,6 +75,36 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Check GitHub Packages version
+        id: github_package_version
+        run: |
+          OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          GITHUB_PACKAGE_NAME="@${OWNER}/${PACKAGE_NAME}"
+          echo "GITHUB_PACKAGE_NAME=${GITHUB_PACKAGE_NAME}" >> "$GITHUB_ENV"
+          if npm view "${GITHUB_PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "GITHUB_PACKAGE_STATUS=published" >> "$GITHUB_ENV"
+            echo "${GITHUB_PACKAGE_NAME}@${PACKAGE_VERSION} is already published to GitHub Packages."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "GITHUB_PACKAGE_STATUS=missing" >> "$GITHUB_ENV"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish GitHub Packages mirror
+        if: steps.github_package_version.outputs.published != 'true'
+        run: node scripts/publish-github-package.mjs
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mark GitHub Packages mirror as published
+        if: steps.github_package_version.outputs.published != 'true'
+        run: echo "GITHUB_PACKAGE_STATUS=published" >> "$GITHUB_ENV"
 
       - name: Sync GitHub Release with npm
         run: node scripts/sync-release.mjs

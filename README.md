@@ -32,6 +32,14 @@ promised until tested.
 npm i cesium-ez-tree cesium@1.141 @cesium/engine@25
 ```
 
+The canonical package is published on npm as `cesium-ez-tree`. GitHub Releases
+also publish a GitHub Packages mirror as `@xiaobai-grow/cesium-ez-tree` so the
+repository Packages panel and each Release stay connected:
+
+```bash
+npm i @xiaobai-grow/cesium-ez-tree --registry=https://npm.pkg.github.com
+```
+
 ## Asset And Worker Setup
 
 The package includes runtime assets under `assets/` and worker bundles under
@@ -161,7 +169,7 @@ if that exact version is already available on npm.
 
 After publishing, the workflow creates or updates the matching GitHub Release
 and writes a managed package-status block that links the Release, npm package,
-install command, tarball metadata, and live demo.
+GitHub Packages mirror, install commands, tarball metadata, and live demo.
 
 To enable npm publishing from GitHub Actions, add a repository secret named
 `NPM_TOKEN` with publish permission for this package. Use an npm granular access
