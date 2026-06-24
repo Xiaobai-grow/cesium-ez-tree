@@ -1,8 +1,7 @@
 # cesium-ez-tree
 
 `cesium-ez-tree` is a CesiumJS procedural vegetation primitive for rendering
-instanced trees, grass, flowers, and rocks. It packages the EzTree work that was
-previously living inside a CesiumJS fork into a standalone GitHub/npm library.
+instanced trees, grass, flowers, and rocks.
 
 This project is inspired by and partially derived from Daniel Greenheck's
 [EZ-Tree](https://github.com/dgreenheck/ez-tree). EZ-Tree is a Three.js
