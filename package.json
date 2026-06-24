@@ -26,6 +26,7 @@
   ],
   "scripts": {
     "build": "vite build && node scripts/build-workers.mjs && node scripts/copy-assets.mjs",
+    "build:pages": "vite build --config vite.pages.config.js --base=/cesium-ez-tree/",
     "dev": "vite --host 127.0.0.1",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test tests/*.test.mjs",

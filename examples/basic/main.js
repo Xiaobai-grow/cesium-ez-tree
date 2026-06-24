@@ -6,10 +6,18 @@ import {
 } from "../../src/index.js";
 import "./style.css";
 
-Cesium.buildModuleUrl.setBaseUrl("/cesium/");
+const siteBaseUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+const cesiumBaseUrl = import.meta.env.DEV
+  ? "/cesium/"
+  : new URL("cesium/", siteBaseUrl).href;
+const ezTreeAssetBaseUrl = import.meta.env.DEV
+  ? new URL(/* @vite-ignore */ "../../assets/", import.meta.url).href
+  : new URL("ez-tree-assets/", siteBaseUrl).href;
+
+Cesium.buildModuleUrl.setBaseUrl(cesiumBaseUrl);
 
 configureEzTree({
-  assetBaseUrl: new URL("../../assets/", import.meta.url).href,
+  assetBaseUrl: ezTreeAssetBaseUrl,
   useWorkers: false,
 });
 

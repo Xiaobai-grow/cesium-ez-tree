@@ -40,5 +40,8 @@ jobs:
       - name: Build package
         run: npm run build
 
+      - name: Build GitHub Pages example
+        run: npm run build:pages
+
       - name: Verify npm package contents
         run: npm run pack:dry-run
