@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Initial standalone packaging work for `cesium-ez-tree`.
+## 0.1.1
+
+- Added Chinese documentation and feedback guidance.
 
 ## 0.1.0
 

@@ -1,6 +1,6 @@
 {
   "name": "cesium-ez-tree",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Procedural EzTree vegetation primitive for CesiumJS.",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,7 +22,8 @@
     "CHANGELOG.md",
     "LICENSE",
     "NOTICE.md",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md"
   ],
   "scripts": {
     "build": "vite build && node scripts/build-workers.mjs && node scripts/copy-assets.mjs",
