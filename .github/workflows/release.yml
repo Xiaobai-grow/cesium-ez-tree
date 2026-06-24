@@ -42,10 +42,11 @@ jobs:
       - name: Configure GitHub Packages registry
         run: |
           OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
           {
             echo "@${OWNER}:registry=https://npm.pkg.github.com"
             echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
-          } >> ~/.npmrc
+          } >> "${NPMRC}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
