@@ -1,5 +1,9 @@
 # cesium-ez-tree
 
+[![CI](https://github.com/Xiaobai-grow/cesium-ez-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/Xiaobai-grow/cesium-ez-tree/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/cesium-ez-tree.svg)](https://www.npmjs.com/package/cesium-ez-tree)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 `cesium-ez-tree` is a CesiumJS procedural vegetation primitive for rendering
 instanced trees, grass, flowers, and rocks.
 
@@ -134,6 +138,27 @@ npm run pack:dry-run
 `npm run dev` starts the standalone Vite example in `examples/basic`.
 Open it at `http://127.0.0.1:5173/examples/basic/`.
 
+## CI/CD
+
+GitHub Actions runs CI on pushes and pull requests targeting `main`:
+
+```bash
+npm ci
+npm test
+npm run build
+npm run pack:dry-run
+```
+
+Publishing is handled by the `Release` workflow when a GitHub Release is
+published. The release tag must match `package.json`, for example `v0.1.1` for
+package version `0.1.1`. The workflow skips publishing if that exact version is
+already available on npm.
+
+To enable npm publishing from GitHub Actions, add a repository secret named
+`NPM_TOKEN` with publish permission for this package. Use an npm granular access
+token with `Read and write` permission and 2FA bypass enabled, or an npm
+automation token.
+
 ## Versioning
 
 This package uses SemVer.
@@ -152,7 +177,17 @@ npm run build
 npm run pack:dry-run
 npm version patch
 git push --follow-tags
-npm publish
+```
+
+Then create and publish a GitHub Release for the pushed tag. The CD workflow
+will publish the package to npm.
+
+Suggested GitHub repository About settings:
+
+```text
+Description: Procedural EzTree vegetation primitives for CesiumJS.
+Website: https://www.npmjs.com/package/cesium-ez-tree
+Topics: cesium, cesiumjs, eztree, vegetation, procedural-generation, instancing, webgl, npm-package
 ```
 
 ## Attribution
