@@ -2098,6 +2098,11 @@ EzTreePrimitive.prototype.destroy = function () {
  * @param {number} [options.seed=0] The random seed.
  * @param {number} [options.width=120.0] The generated area width, in local meters.
  * @param {number} [options.depth=120.0] The generated area depth, in local meters.
+ * @param {object[]|object} [options.polygon] Optional polygon outline. Either a flat ring of vertices, or `{ positions, holes }` with inner rings excluded. Vertices are longitude/latitude (degrees), a Cesium Cartesian3, or local { x, y } meters. Overrides width and depth.
+ * @param {Matrix4} [options.modelMatrix=Matrix4.IDENTITY] The local ENU-to-world transform used to convert polygon vertices to local meters.
+ * @param {string} [options.treePreset="Mixed"] Tree preset name, or "Mixed" to cycle through presets.
+ * @param {string[]} [options.presets] Tree preset names cycled through when treePreset is "Mixed".
+ * @param {object[]} [options.points] Fixed tree positions (longitude/latitude, a Cesium Cartesian3, or local { x, y } meters). Generates one tree per point instead of area-based distribution.
  * @param {number} [options.treeDensity] Tree density in instances per hectare.
  * @param {number} [options.grassDensity] Grass density in instances per hectare.
  * @param {number} [options.flowerDensity] Flower density in instances per hectare.

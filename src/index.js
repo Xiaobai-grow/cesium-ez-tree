@@ -17,6 +17,7 @@ import EzTreeOptions, {
 } from "./EzTree/EzTreeOptions.js";
 import EzTreePreset from "./EzTree/EzTreePreset.js";
 import EzTreePrimitive from "./EzTree/EzTreePrimitive.js";
+import EzTreeGeoJSON from "./EzTree/EzTreeGeoJSON.js";
 import EzTreeRNG from "./EzTree/EzTreeRNG.js";
 import EzTreeLeafTypeDefault from "./EzTree/EzTreeLeafType.js";
 import EzTreeTreeTypeDefault from "./EzTree/EzTreeType.js";
@@ -34,6 +35,7 @@ function installEzTree(Cesium) {
   }
 
   Cesium.EzTreePrimitive = EzTreePrimitive;
+  Cesium.EzTreeGeoJSON = EzTreeGeoJSON;
   Cesium.EzTreeOptions = EzTreeOptions;
   Cesium.EzTreeGenerator = EzTreeGenerator;
   Cesium.EzTreePreset = EzTreePreset;
@@ -54,6 +56,7 @@ const api = Object.freeze({
   EzTreeOptions,
   EzTreePreset,
   EzTreePrimitive,
+  EzTreeGeoJSON,
   EzTreeRNG,
   EzTreeTreeType: EzTreeTreeTypeDefault,
   LeafType: EzTreeLeafType,
@@ -83,6 +86,7 @@ export {
   EzTreeOptions,
   EzTreePreset,
   EzTreePrimitive,
+  EzTreeGeoJSON,
   EzTreeRNG,
   EzTreeTreeTypeDefault as EzTreeTreeType,
   EzTreeLeafType as LeafType,

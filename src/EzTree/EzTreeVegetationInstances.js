@@ -2,6 +2,9 @@ import Cartesian3 from "@cesium/engine/Source/Core/Cartesian3.js";
 import Color from "@cesium/engine/Source/Core/Color.js";
 import Frozen from "@cesium/engine/Source/Core/Frozen.js";
 import EzTreeRNG from "./EzTreeRNG.js";
+import convertPolygonToLocal, {
+  convertPointsToLocal,
+} from "./EzTreePolygon.js";
 
 const defaultTreePresets = Object.freeze([
   "Oak Medium",
@@ -18,6 +21,184 @@ function randomInRectangle(rng, width, depth) {
     rng.random(depth * 0.5, -depth * 0.5),
     0.0,
   );
+}
+
+function normalizeRing(ring) {
+  if (!Array.isArray(ring) || ring.length < 3) {
+    return undefined;
+  }
+
+  const points = new Array(ring.length);
+  for (let i = 0; i < ring.length; i++) {
+    const point = ring[i];
+    if (Array.isArray(point)) {
+      points[i] = { x: point[0], y: point[1] };
+    } else {
+      points[i] = { x: point.x, y: point.y };
+    }
+  }
+  return points;
+}
+
+function normalizeRegion(polygon) {
+  // 单个外环
+  if (Array.isArray(polygon)) {
+    const outer = normalizeRing(polygon);
+    return outer !== undefined ? { outer: outer, holes: [] } : undefined;
+  }
+
+  // 带孔洞结构：{ positions: 外环, holes: [内环, ...] }
+  if (
+    polygon !== null &&
+    typeof polygon === "object" &&
+    Array.isArray(polygon.positions)
+  ) {
+    const outer = normalizeRing(polygon.positions);
+    if (outer === undefined) {
+      return undefined;
+    }
+
+    const holes = [];
+    if (Array.isArray(polygon.holes)) {
+      for (let i = 0; i < polygon.holes.length; i++) {
+        const hole = normalizeRing(polygon.holes[i]);
+        if (hole !== undefined) {
+          holes.push(hole);
+        }
+      }
+    }
+    return { outer: outer, holes: holes };
+  }
+
+  return undefined;
+}
+
+function computePolygonArea(points) {
+  let area = 0.0;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    area += points[i].x * points[j].y - points[j].x * points[i].y;
+  }
+  return Math.abs(area) * 0.5;
+}
+
+function computeRegionArea(region) {
+  let area = computePolygonArea(region.outer);
+  for (let i = 0; i < region.holes.length; i++) {
+    area -= computePolygonArea(region.holes[i]);
+  }
+  return Math.max(0.0, area);
+}
+
+function isPointInPolygon(x, y, points) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const xi = points[i].x;
+    const yi = points[i].y;
+    const xj = points[j].x;
+    const yj = points[j].y;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+const polygonSampleAttemptCount = 48;
+
+function createPolygonSampler(points) {
+  const x0 = points[0].x;
+  const y0 = points[0].y;
+
+  // Area-weighted triangle fan for near-uniform sampling inside the polygon.
+  const triangleAreas = [];
+  let totalArea = 0.0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const x1 = points[i].x;
+    const y1 = points[i].y;
+    const x2 = points[i + 1].x;
+    const y2 = points[i + 1].y;
+    const area =
+      Math.abs((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)) * 0.5;
+    triangleAreas.push(area);
+    totalArea += area;
+  }
+
+  let centroidX = 0.0;
+  let centroidY = 0.0;
+  for (let i = 0; i < points.length; i++) {
+    centroidX += points[i].x;
+    centroidY += points[i].y;
+  }
+  centroidX /= points.length;
+  centroidY /= points.length;
+
+  return function (rng) {
+    for (let attempt = 0; attempt < polygonSampleAttemptCount; attempt++) {
+      let pick = rng.random(totalArea);
+      let index = 0;
+      for (let i = 0; i < triangleAreas.length; i++) {
+        pick -= triangleAreas[i];
+        if (pick <= 0.0) {
+          index = i;
+          break;
+        }
+      }
+
+      const a = index + 1;
+      const b = index + 2;
+      let u = rng.random();
+      let v = rng.random();
+      if (u + v > 1.0) {
+        u = 1.0 - u;
+        v = 1.0 - v;
+      }
+      const x = (1.0 - u - v) * x0 + u * points[a].x + v * points[b].x;
+      const y = (1.0 - u - v) * y0 + u * points[a].y + v * points[b].y;
+
+      if (isPointInPolygon(x, y, points)) {
+        return new Cartesian3(x, y, 0.0);
+      }
+    }
+
+    // Fallback: polygon centroid.
+    return new Cartesian3(centroidX, centroidY, 0.0);
+  };
+}
+
+const regionSampleAttemptCount = 32;
+
+function createRegionSampler(region) {
+  const sampleOuter = createPolygonSampler(region.outer);
+  const holes = region.holes;
+
+  return function (rng) {
+    for (let attempt = 0; attempt < regionSampleAttemptCount; attempt++) {
+      const position = sampleOuter(rng);
+      let insideHole = false;
+      for (let i = 0; i < holes.length; i++) {
+        if (isPointInPolygon(position.x, position.y, holes[i])) {
+          insideHole = true;
+          break;
+        }
+      }
+      if (!insideHole) {
+        return position;
+      }
+    }
+
+    // 兜底：外环质心（极少数情况下可能落入孔洞）
+    return sampleOuter(rng);
+  };
+}
+
+function createRandomPosition(width, depth, region) {
+  if (region !== undefined) {
+    return createRegionSampler(region);
+  }
+
+  return function (rng) {
+    return randomInRectangle(rng, width, depth);
+  };
 }
 
 function clamp(value, minimum, maximum) {
@@ -102,19 +283,19 @@ function isGrassPatchPosition(position, rng, patchScale, patchiness) {
   return noise <= patchiness || rng.random() + 0.6 <= patchiness;
 }
 
-function randomGrassInPatch(rng, width, depth, patchScale, patchiness) {
+function randomGrassPosition(rng, randomPosition, patchScale, patchiness) {
   let position;
   for (let i = 0; i < 32; i++) {
-    position = randomInRectangle(rng, width, depth);
+    position = randomPosition(rng);
     if (isGrassPatchPosition(position, rng, patchScale, patchiness)) {
       return position;
     }
   }
 
-  return position ?? randomInRectangle(rng, width, depth);
+  return position ?? randomPosition(rng);
 }
 
-function getMinimumTreeSpacing(options, width, depth, treeCount, treeScale) {
+function getMinimumTreeSpacing(options, area, treeCount, treeScale) {
   if (options.minimumTreeSpacing !== undefined) {
     return Number.isFinite(options.minimumTreeSpacing)
       ? Math.max(0.0, options.minimumTreeSpacing)
@@ -125,7 +306,7 @@ function getMinimumTreeSpacing(options, width, depth, treeCount, treeScale) {
     return 0.0;
   }
 
-  const averageTreeSpacing = Math.sqrt((width * depth) / treeCount);
+  const averageTreeSpacing = Math.sqrt(area / treeCount);
   const scaledTreeSpacing = Number.isFinite(treeScale) ? treeScale * 18.0 : 0.0;
   return Math.max(0.0, Math.min(scaledTreeSpacing, averageTreeSpacing * 0.6));
 }
@@ -175,9 +356,9 @@ function addTreePosition(position, grid, cellSize) {
   bucket.push(position);
 }
 
-function randomTreeInRectangle(rng, width, depth, grid, minimumTreeSpacing) {
+function randomTreePosition(rng, randomPosition, grid, minimumTreeSpacing) {
   if (minimumTreeSpacing <= 0.0) {
-    return randomInRectangle(rng, width, depth);
+    return randomPosition(rng);
   }
 
   const minimumDistanceSquared = minimumTreeSpacing * minimumTreeSpacing;
@@ -185,7 +366,7 @@ function randomTreeInRectangle(rng, width, depth, grid, minimumTreeSpacing) {
   let bestDistanceSquared = -1.0;
 
   for (let i = 0; i < treePlacementAttemptCount; i++) {
-    const position = randomInRectangle(rng, width, depth);
+    const position = randomPosition(rng);
     const distanceSquared = getNearestTreeDistanceSquared(
       position,
       grid,
@@ -228,10 +409,35 @@ function capCount(count, maximum) {
   return Math.min(count, Math.max(0, Math.floor(maximum)));
 }
 
+function createTreeInstancesAtPoints(points, rng, treePreset, presets, treeScale) {
+  const instances = [];
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    const preset =
+      treePreset === "Mixed" ? presets[i % presets.length] : treePreset;
+    const scale = treeScale * rng.random(1.25, 0.72);
+    instances.push({
+      kind: "tree",
+      preset: preset,
+      translation: new Cartesian3(point.x, point.y, point.z ?? 0.0),
+      rotation: rng.random(Math.PI * 2.0),
+      scale: new Cartesian3(scale, scale, scale),
+      colorVariation: rng.random(1.12, 0.88),
+      windPhase: rng.random(),
+    });
+  }
+  return instances;
+}
+
 /**
  * Creates random vegetation instances for EzTreePrimitive.
  *
  * @param {object} [options] Vegetation distribution options.
+ * @param {object[]|object} [options.polygon] Polygon outline restricting placement. Either a flat ring of vertices, or `{ positions, holes }` with inner rings excluded from placement. Vertices are longitude/latitude (degrees), a Cesium Cartesian3, or local { x, y } meters. Overrides width and depth.
+ * @param {Matrix4} [options.modelMatrix=Matrix4.IDENTITY] The local ENU-to-world transform used to convert polygon vertices to local meters.
+ * @param {string} [options.treePreset="Mixed"] Tree preset name, or "Mixed" to cycle through presets.
+ * @param {string[]} [options.presets] Tree preset names cycled through when treePreset is "Mixed".
+ * @param {object[]} [options.points] Fixed tree positions (longitude/latitude, a Cesium Cartesian3, or local { x, y } meters). Generates one tree per point instead of area-based distribution.
  * @param {number} [options.minimumTreeSpacing] Minimum tree spacing in meters. Derived from density and scale by default.
  * @param {number} [options.rockDensity=6.0] Rock density in instances per hectare.
  * @param {number} [options.grassPatchScale=100.0] Approximate grass patch size in meters.
@@ -246,9 +452,29 @@ function capCount(count, maximum) {
 export default function createEzTreeVegetationInstances(options) {
   options = options ?? Frozen.EMPTY_OBJECT;
   const rng = new EzTreeRNG(options.seed ?? 0);
+  const treePreset = options.treePreset ?? "Mixed";
+  const presets = options.presets ?? defaultTreePresets;
+  const treeScale = options.treeScale ?? 0.62;
+
+  const points = convertPointsToLocal(options.points, options.modelMatrix);
+  if (Array.isArray(points) && points.length > 0) {
+    return createTreeInstancesAtPoints(
+      points,
+      rng,
+      treePreset,
+      presets,
+      treeScale,
+    );
+  }
+
   const width = options.width ?? 120.0;
   const depth = options.depth ?? 120.0;
-  const areaHectares = (width * depth) / 10000.0;
+  const region = normalizeRegion(
+    convertPolygonToLocal(options.polygon, options.modelMatrix),
+  );
+  const area = region !== undefined ? computeRegionArea(region) : width * depth;
+  const randomPosition = createRandomPosition(width, depth, region);
+  const areaHectares = area / 10000.0;
   const treeCount =
     options.treeCount ??
     Math.round((options.treeDensity ?? 20.0) * areaHectares);
@@ -267,9 +493,6 @@ export default function createEzTreeVegetationInstances(options) {
       Math.round((options.rockDensity ?? 6.0) * areaHectares),
     options.maximumRockCount ?? 5000,
   );
-  const treePreset = options.treePreset ?? "Mixed";
-  const presets = options.presets ?? defaultTreePresets;
-  const treeScale = options.treeScale ?? 0.62;
   const grassScale = options.grassScale ?? 1.0;
   const grassPatchScale = Math.max(0.001, options.grassPatchScale ?? 100.0);
   const grassPatchiness = clamp(options.grassPatchiness ?? 0.7, 0.0, 1.0);
@@ -277,8 +500,7 @@ export default function createEzTreeVegetationInstances(options) {
   const rockScale = options.rockScale ?? 1.0;
   const minimumTreeSpacing = getMinimumTreeSpacing(
     options,
-    width,
-    depth,
+    area,
     treeCount,
     treeScale,
   );
@@ -292,10 +514,9 @@ export default function createEzTreeVegetationInstances(options) {
     instances.push({
       kind: "tree",
       preset: preset,
-      translation: randomTreeInRectangle(
+      translation: randomTreePosition(
         rng,
-        width,
-        depth,
+        randomPosition,
         treeGrid,
         minimumTreeSpacing,
       ),
@@ -311,10 +532,9 @@ export default function createEzTreeVegetationInstances(options) {
     const widthScale = grassScale * rng.random(6.0, 5.0);
     instances.push({
       kind: "grass",
-      translation: randomGrassInPatch(
+      translation: randomGrassPosition(
         rng,
-        width,
-        depth,
+        randomPosition,
         grassPatchScale,
         grassPatchiness,
       ),
@@ -331,10 +551,9 @@ export default function createEzTreeVegetationInstances(options) {
     instances.push({
       kind: "flower",
       asset: flowerAssets[i % flowerAssets.length],
-      translation: randomGrassInPatch(
+      translation: randomGrassPosition(
         rng,
-        width,
-        depth,
+        randomPosition,
         grassPatchScale,
         grassPatchiness,
       ),
@@ -349,7 +568,7 @@ export default function createEzTreeVegetationInstances(options) {
   const rockAssets = ["rock1", "rock2", "rock3"];
   for (let i = 0; i < rockCount; i++) {
     const scale = rockScale * rng.random(5.0, 2.0);
-    const translation = randomInRectangle(rng, width, depth);
+    const translation = randomPosition(rng);
     translation.z = 0.3;
     instances.push({
       kind: "rock",

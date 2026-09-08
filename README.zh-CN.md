@@ -101,6 +101,121 @@ viewer.scene.primitives.add(
 );
 ```
 
+## 多边形用法
+
+多边形顶点使用角度制的 `[经度, 纬度]`。实例生成和 Primitive 必须传入
+同一个 ENU `modelMatrix`。可以通过 `holes` 设置多边形内环（孔洞）。
+
+```js
+import * as Cesium from "cesium";
+import { EzTreePrimitive } from "cesium-ez-tree";
+
+const polygon = {
+  positions: [
+    [-122.3910, 37.6178],
+    [-122.3878, 37.6178],
+    [-122.3878, 37.6200],
+    [-122.3910, 37.6200],
+    [-122.3910, 37.6178],
+  ],
+  holes: [
+    [
+      [-122.3900, 37.6185],
+      [-122.3888, 37.6185],
+      [-122.3888, 37.6192],
+      [-122.3900, 37.6192],
+      [-122.3900, 37.6185],
+    ],
+  ],
+};
+
+const modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(
+  Cesium.Cartesian3.fromDegrees(-122.3894, 37.6189),
+);
+const instances = await EzTreePrimitive.createVegetationInstancesAsync({
+  modelMatrix,
+  polygon,
+  seed: 12,
+  treeDensity: 18,
+  grassDensity: 650,
+  flowerDensity: 45,
+  rockDensity: 8,
+});
+
+viewer.scene.primitives.add(
+  new EzTreePrimitive({ modelMatrix, instances }),
+);
+```
+
+## GeoJSON 用法
+
+`EzTreeGeoJSON` 支持 `Polygon`、`MultiPolygon`、`Point`、`MultiPoint`，以及
+嵌套的 `GeometryCollection`。点坐标可以使用 `[经度, 纬度, 高度]`。Feature 的
+properties 会覆盖图层中对应的植被参数。
+
+```js
+import { EzTreeGeoJSON } from "cesium-ez-tree";
+
+const geojson = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      properties: {
+        treePreset: "Pine Medium",
+        treeCount: 120,
+        grassCount: 800,
+      },
+      geometry: {
+        type: "Polygon",
+        coordinates: [[
+          [-122.3910, 37.6178],
+          [-122.3878, 37.6178],
+          [-122.3878, 37.6200],
+          [-122.3910, 37.6200],
+          [-122.3910, 37.6178],
+        ]],
+      },
+    },
+    {
+      type: "Feature",
+      properties: { treePreset: "Oak Medium", treeScale: 0.7 },
+      geometry: {
+        type: "MultiPoint",
+        coordinates: [
+          [-122.3902, 37.6204, 12],
+          [-122.3892, 37.6204, 18],
+        ],
+      },
+    },
+  ],
+};
+
+try {
+  const layer = await EzTreeGeoJSON.load(geojson, {
+    viewer,
+    treeDensity: 18,
+    grassDensity: 650,
+    flowerDensity: 45,
+    rockDensity: 8,
+    clampToTerrain: true,
+    terrainSamplingTimeout: 15000,
+    primitiveOptions: {
+      windStrength: 0.1,
+      maximumGrassDistance: 800,
+    },
+  });
+
+  console.log(layer.polygonCount, layer.pointCount, layer.counts);
+  // 后续可使用：layer.show = false、layer.clear() 或 layer.destroy()
+} catch (error) {
+  console.error("植被 GeoJSON 加载失败：", error);
+}
+```
+
+启用 `clampToTerrain` 后，地形采样默认最多等待 30 秒。可以通过
+`terrainSamplingTimeout` 设置等待毫秒数，或者设为 `0` 关闭超时。
+
 为了兼容旧的 Sandcastle 风格示例，也可以把 API 挂到 Cesium 命名空间：
 
 ```js
@@ -119,7 +234,9 @@ const primitive = new Cesium.EzTreePrimitive({ instances });
 - `EzTreePrimitive`：用于渲染程序化植被的 Cesium Primitive。
 - `EzTreePrimitive.createVegetationInstances(options)`：同步生成实例。
 - `EzTreePrimitive.createVegetationInstancesAsync(options)`：使用 worker 生成实例，
-  并提供同步 fallback。
+  并提供同步 fallback。使用 `polygon` 限定植被范围，或使用 `points` 设置固定树木点位。
+- `EzTreeGeoJSON`：从 Polygon、MultiPolygon、Point、MultiPoint 和
+  GeometryCollection GeoJSON 加载并管理植被。
 - `EzTreeOptions`、`EzTreeGenerator`、`generateTreeGeometry(options)`：底层树木
   参数与几何生成工具。
 - `TreePreset` / `loadEzTreePreset(name)`：内置树木预设，例如 `Oak Medium`、
