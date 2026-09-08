@@ -128,6 +128,44 @@ test("loads polygon and point GeoJSON into managed primitives", async () => {
   assert.equal(layer.isDestroyed(), true);
 });
 
+test("preserves Point and MultiPoint coordinate heights", async () => {
+  const { viewer, primitives } = createViewer();
+  const layer = await EzTreeGeoJSON.load(
+    {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "Point", coordinates: [118.85, 32.06, 25] },
+        },
+        {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "MultiPoint",
+            coordinates: [
+              [118.85, 32.06, 50],
+              [118.85, 32.06, 75],
+            ],
+          },
+        },
+      ],
+    },
+    { viewer },
+  );
+
+  assert.equal(layer.pointCount, 3);
+  assert.equal(primitives.length, 1);
+  assert.deepEqual(
+    primitives[0].instances.map((instance) =>
+      Math.round(instance.translation.z),
+    ),
+    [25, 50, 75],
+  );
+  layer.destroy();
+});
+
 test("loads bare geometry and applies vegetation type switches", async () => {
   const { viewer, primitives } = createViewer();
   const layer = await EzTreeGeoJSON.load(
