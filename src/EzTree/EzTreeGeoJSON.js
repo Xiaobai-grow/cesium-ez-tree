@@ -49,6 +49,16 @@ const pointBatchOptionKeys = Object.freeze([
   "presets",
   "treeScale",
 ]);
+const defaultTerrainSamplingTimeout = 30000;
+
+class TerrainSamplingTimeoutError extends Error {
+  constructor(timeout) {
+    super(
+      `EzTreeGeoJSON terrain sampling timed out after ${timeout} ms. Reduce the GeoJSON range, increase terrainSamplingTimeout, wait for terrain to load, or disable clampToTerrain.`,
+    );
+    this.name = "TerrainSamplingTimeoutError";
+  }
+}
 
 function emptyCounts() {
   return { tree: 0, grass: 0, flower: 0, rock: 0 };
@@ -322,7 +332,27 @@ function createPointBatches(pointGroups, defaults) {
   return batches.values();
 }
 
-async function clampTreesToTerrain(instances, modelMatrix, terrainProvider) {
+function sampleTerrainWithTimeout(terrainProvider, cartographics, timeout) {
+  const sampling = sampleTerrainMostDetailed(terrainProvider, cartographics);
+  if (timeout === 0) return sampling;
+
+  let timer;
+  const timeoutPromise = new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new TerrainSamplingTimeoutError(timeout));
+    }, timeout);
+  });
+  return Promise.race([sampling, timeoutPromise]).finally(() => {
+    clearTimeout(timer);
+  });
+}
+
+async function clampTreesToTerrain(
+  instances,
+  modelMatrix,
+  terrainProvider,
+  timeout,
+) {
   if (!terrainProvider) return instances;
 
   const treeIndices = [];
@@ -342,7 +372,7 @@ async function clampTreesToTerrain(instances, modelMatrix, terrainProvider) {
   if (cartographics.length === 0) return instances;
 
   try {
-    await sampleTerrainMostDetailed(terrainProvider, cartographics);
+    await sampleTerrainWithTimeout(terrainProvider, cartographics, timeout);
     const inverseModelMatrix = Matrix4.inverse(modelMatrix, new Matrix4());
     const world = new Cartesian3();
     const local = new Cartesian3();
@@ -363,6 +393,9 @@ async function clampTreesToTerrain(instances, modelMatrix, terrainProvider) {
     }
   } catch (error) {
     console.warn("EzTreeGeoJSON terrain sampling failed", error);
+    if (error instanceof TerrainSamplingTimeoutError) {
+      throw error;
+    }
   }
 
   return instances;
@@ -393,6 +426,16 @@ class EzTreeGeoJSON {
     this._viewer = options.viewer;
     this._terrainProvider = options.terrainProvider;
     this._clampToTerrain = options.clampToTerrain ?? false;
+    this._terrainSamplingTimeout =
+      options.terrainSamplingTimeout ?? defaultTerrainSamplingTimeout;
+    if (
+      !Number.isFinite(this._terrainSamplingTimeout) ||
+      this._terrainSamplingTimeout < 0
+    ) {
+      throw new TypeError(
+        "EzTreeGeoJSON terrainSamplingTimeout must be a finite non-negative number.",
+      );
+    }
     this._primitiveOptions = isObject(options.primitiveOptions)
       ? { ...options.primitiveOptions }
       : {};
@@ -521,6 +564,7 @@ class EzTreeGeoJSON {
         instances,
         modelMatrix,
         this._terrainProvider ?? this._viewer.terrainProvider,
+        this._terrainSamplingTimeout,
       );
     }
     return instances;

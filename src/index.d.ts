@@ -173,6 +173,8 @@ export interface EzTreeGeoJSONOptions
   primitiveOptions?: EzTreePrimitiveOptions;
   terrainProvider?: unknown;
   clampToTerrain?: boolean;
+  /** Maximum terrain sampling wait in milliseconds. Defaults to 30000; use 0 to disable the timeout. */
+  terrainSamplingTimeout?: number;
 }
 
 export class EzTreeGeoJSON {

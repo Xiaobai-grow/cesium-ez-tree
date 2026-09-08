@@ -104,6 +104,124 @@ viewer.scene.primitives.add(
 );
 ```
 
+## Polygon Usage
+
+Polygon vertices use `[longitude, latitude]` in degrees. Pass the same
+ENU `modelMatrix` to instance generation and the primitive. Inner rings can be
+provided with `holes`.
+
+```js
+import * as Cesium from "cesium";
+import { EzTreePrimitive } from "cesium-ez-tree";
+
+const polygon = {
+  positions: [
+    [-122.3910, 37.6178],
+    [-122.3878, 37.6178],
+    [-122.3878, 37.6200],
+    [-122.3910, 37.6200],
+    [-122.3910, 37.6178],
+  ],
+  holes: [
+    [
+      [-122.3900, 37.6185],
+      [-122.3888, 37.6185],
+      [-122.3888, 37.6192],
+      [-122.3900, 37.6192],
+      [-122.3900, 37.6185],
+    ],
+  ],
+};
+
+const modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(
+  Cesium.Cartesian3.fromDegrees(-122.3894, 37.6189),
+);
+const instances = await EzTreePrimitive.createVegetationInstancesAsync({
+  modelMatrix,
+  polygon,
+  seed: 12,
+  treeDensity: 18,
+  grassDensity: 650,
+  flowerDensity: 45,
+  rockDensity: 8,
+});
+
+viewer.scene.primitives.add(
+  new EzTreePrimitive({ modelMatrix, instances }),
+);
+```
+
+## GeoJSON Usage
+
+`EzTreeGeoJSON` supports `Polygon`, `MultiPolygon`, `Point`, `MultiPoint`, and
+nested `GeometryCollection` geometries. Point coordinates may include a height
+as `[longitude, latitude, height]`. Feature properties override matching layer
+vegetation options.
+
+```js
+import { EzTreeGeoJSON } from "cesium-ez-tree";
+
+const geojson = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      properties: {
+        treePreset: "Pine Medium",
+        treeCount: 120,
+        grassCount: 800,
+      },
+      geometry: {
+        type: "Polygon",
+        coordinates: [[
+          [-122.3910, 37.6178],
+          [-122.3878, 37.6178],
+          [-122.3878, 37.6200],
+          [-122.3910, 37.6200],
+          [-122.3910, 37.6178],
+        ]],
+      },
+    },
+    {
+      type: "Feature",
+      properties: { treePreset: "Oak Medium", treeScale: 0.7 },
+      geometry: {
+        type: "MultiPoint",
+        coordinates: [
+          [-122.3902, 37.6204, 12],
+          [-122.3892, 37.6204, 18],
+        ],
+      },
+    },
+  ],
+};
+
+try {
+  const layer = await EzTreeGeoJSON.load(geojson, {
+    viewer,
+    treeDensity: 18,
+    grassDensity: 650,
+    flowerDensity: 45,
+    rockDensity: 8,
+    clampToTerrain: true,
+    terrainSamplingTimeout: 15000,
+    primitiveOptions: {
+      windStrength: 0.1,
+      maximumGrassDistance: 800,
+    },
+  });
+
+  console.log(layer.polygonCount, layer.pointCount, layer.counts);
+  // Later: layer.show = false; layer.clear(); or layer.destroy();
+} catch (error) {
+  console.error("Failed to load vegetation GeoJSON:", error);
+}
+```
+
+When `clampToTerrain` is enabled, terrain sampling waits up to 30 seconds by
+default. Set `terrainSamplingTimeout` in milliseconds, or use `0` to disable
+the timeout.
+
 For compatibility with old Sandcastle-style examples, you can also attach the
 API to a Cesium namespace:
 
@@ -124,7 +242,10 @@ const primitive = new Cesium.EzTreePrimitive({ instances });
 - `EzTreePrimitive.createVegetationInstances(options)`: synchronous instance
   generation.
 - `EzTreePrimitive.createVegetationInstancesAsync(options)`: worker-backed
-  generation with synchronous fallback.
+  generation with synchronous fallback. Use `polygon` for bounded vegetation or
+  `points` for fixed tree positions.
+- `EzTreeGeoJSON`: loads and manages vegetation from Polygon, MultiPolygon,
+  Point, MultiPoint, and GeometryCollection GeoJSON.
 - `EzTreeOptions`, `EzTreeGenerator`, `generateTreeGeometry(options)`: lower
   level tree option and geometry helpers.
 - `TreePreset` / `loadEzTreePreset(name)`: built-in tree presets such as
