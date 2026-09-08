@@ -1,0 +1,96 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "松树林（含空地孔洞）",
+        "treePreset": "Pine Medium",
+        "treeDensity": 50,
+        "grassDensity": 300,
+        "flowerDensity": 0,
+        "rockDensity": 1
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [118.84652, 32.0655],
+            [118.86052, 32.0655],
+            [118.86052, 32.0755],
+            [118.84652, 32.0755],
+            [118.84652, 32.0655]
+          ],
+          [
+            [118.85152, 32.0685],
+            [118.85552, 32.0685],
+            [118.85552, 32.0725],
+            [118.85152, 32.0725],
+            [118.85152, 32.0685]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "橡树花园",
+        "treePreset": "Oak Medium",
+        "treeDensity": 5,
+        "grassDensity": 800,
+        "flowerDensity": 150,
+        "rockDensity": 2
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [118.84052, 32.0575],
+            [118.85052, 32.0575],
+            [118.85052, 32.0635],
+            [118.84052, 32.0635],
+            [118.84052, 32.0575]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "石头区",
+        "treeDensity": 0,
+        "grassDensity": 100,
+        "flowerDensity": 0,
+        "rockDensity": 20
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [118.86252, 32.0595],
+            [118.86752, 32.0595],
+            [118.86752, 32.0645],
+            [118.86252, 32.0645],
+            [118.86252, 32.0595]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "行道树（点）",
+        "treePreset": "Aspen Medium"
+      },
+      "geometry": {
+        "type": "MultiPoint",
+        "coordinates": [
+          [118.84352, 32.0775],
+          [118.84652, 32.0775],
+          [118.84952, 32.0775],
+          [118.85252, 32.0775]
+        ]
+      }
+    }
+  ]
+}
